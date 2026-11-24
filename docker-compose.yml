@@ -1,0 +1,189 @@
+# Nixflow — self-hosted. Free to run on your own server.
+#
+#   ./setup.sh            # once: writes .env with fresh secrets
+#   docker compose up -d  # start (downloads the images on first run)
+#
+# Then open PUBLIC_URL (default http://localhost:8080) and sign up — the first
+# account creates your workspace. See README.md.
+#
+# Database / auth / storage versions match Supabase's own self-hosted setup.
+# NIXFLOW_VERSION in .env pins the Nixflow release (default: latest).
+
+name: nixflow
+
+x-nixflow-image: &nixflow-image
+  image: ghcr.io/vyzappz/nixflow:${NIXFLOW_VERSION:-latest}
+
+services:
+  # ── Database (Postgres with Supabase's roles and extensions) ────────────────
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_min_messages=fatal"]
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD:?run ./setup.sh first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: 3600
+    volumes:
+      - ./db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
+      - ./db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Sign-in (Supabase Auth) ─────────────────────────────────────────────────
+  auth:
+    image: supabase/gotrue:v2.198.0
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_URL}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${PUBLIC_URL}
+      GOTRUE_URI_ALLOW_LIST: ${PUBLIC_URL}/**,${ADMIN_URL}/**
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?run ./setup.sh first}
+      GOTRUE_JWT_ISSUER: ${PUBLIC_URL}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      # No mail server configured → accounts are confirmed straight away.
+      # Set SMTP_* in .env and EMAIL_AUTOCONFIRM=false to require confirmation.
+      GOTRUE_MAILER_AUTOCONFIRM: ${EMAIL_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Nixflow}
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Database REST API (PostgREST) ───────────────────────────────────────────
+  rest:
+    image: postgrest/postgrest:v14.18
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    command: ["postgrest"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_ADMIN_SERVER_HOST: localhost
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── File storage (Files manager uploads) ────────────────────────────────────
+  storage:
+    image: supabase/storage-api:v1.98.6
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      rest: { condition: service_started }
+    environment:
+      ANON_KEY: ${ANON_KEY:?run ./setup.sh first}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY:?run ./setup.sh first}
+      POSTGREST_URL: http://rest:3000
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      STORAGE_PUBLIC_URL: ${PUBLIC_URL}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: stub
+      TENANT_ID: stub
+      REGION: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - storage-data:/var/lib/storage
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://storage:5000/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # ── Nixflow: database migrations (runs, then exits) ─────────────────────────
+  migrate:
+    <<: *nixflow-image
+    command: ["/opt/nixflow/migrate.sh"]
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+      auth: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # ── Nixflow: API + workflow engine ──────────────────────────────────────────
+  api:
+    <<: *nixflow-image
+    command: ["nixflow-backend"]
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      NIXFLOW_EDITION: selfhost
+      PORT: 8080
+      SUPABASE_URL: http://web:8000          # internal gateway, see Caddyfile
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?run ./setup.sh first}
+      APP_URL: ${PUBLIC_URL}
+      ADMIN_URL: ${ADMIN_URL}
+      BACKEND_URL: ${PUBLIC_URL}/backend
+      # Optional
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  # ── Nixflow: web server (app, admin portal, API gateway) ────────────────────
+  web:
+    <<: *nixflow-image
+    command: ["/opt/nixflow/web-entrypoint.sh"]
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?run ./setup.sh first}
+      ADMIN_URL: ${ADMIN_URL}
+      ANON_KEY: ${ANON_KEY}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${ADMIN_HTTP_PORT:-8081}:81"
+
+volumes:
+  db-data:
+  db-config:
+  storage-data:

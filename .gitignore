@@ -1,0 +1,2 @@
+# Backups made by backup.sh contain .env (all secrets) — never commit them.
+backups/
