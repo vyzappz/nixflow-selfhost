@@ -84,6 +84,37 @@ All settings are in `.env`; `.env.example` explains each one. Common ones:
 
 Apply changes with `docker compose up -d`.
 
+## Use your own PostgreSQL
+
+By default Nixflow runs its own database container. To use a PostgreSQL you
+already run instead (your server, AWS RDS, Azure, Google Cloud SQL…):
+
+**You need:** PostgreSQL **15 or newer** with the **pgvector** extension
+available, an **admin** login (superuser, `rds_superuser`, `azure_pg_admin` or
+a Cloud SQL admin), and an **empty** database for Nixflow
+(`CREATE DATABASE nixflow;`).
+
+```sh
+./setup.sh                                   # if you haven't yet
+./external-db/prepare.sh 'postgresql://ADMIN:PASSWORD@HOST:5432/nixflow?sslmode=require'
+docker compose up -d
+```
+
+`prepare.sh` runs `external-db/init.sql` once with your admin login: it creates
+the roles and schemas Nixflow needs and enables the extensions. **Your admin
+password is used only for that and is not saved.** From then on Nixflow logs in
+with its own roles (password = `POSTGRES_PASSWORD` in `.env`) and creates its
+tables on start, as usual.
+
+- **SSL:** add `?sslmode=require` (or `verify-full`) for cloud databases; leave
+  it off for a server without SSL.
+- **Postgres on the same machine:** use `localhost` in the URL — it's
+  translated so the containers can reach it.
+- **Backups:** `./backup.sh` then saves uploaded files and `.env` only — back up
+  the database with your own tooling (e.g. your provider's snapshots).
+- **New installs only:** this starts Nixflow on an empty database. Moving an
+  existing install's data from the built-in database isn't automated yet.
+
 ## Privacy
 
 A self-hosted server sends nothing to Nixflow: no usage tracking, no sign-up or

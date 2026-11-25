@@ -1,0 +1,54 @@
+# Use YOUR OWN PostgreSQL instead of the built-in "db" container.
+#
+# Set up by ./external-db/prepare.sh, which adds to .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.external-db.yml
+#   DB_HOST, DB_PORT, DB_NAME (and DB_SSLMODE)
+# so a plain `docker compose up -d` uses this file. See README → "Use your own
+# PostgreSQL". The service roles log in with POSTGRES_PASSWORD from .env.
+
+x-db-host: &db-host
+  # Lets containers reach a Postgres running on this same machine as
+  # DB_HOST=host.docker.internal (Docker Desktop has it; this adds it on Linux).
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  # The built-in database is not started.
+  db:
+    profiles: ["builtin-db"]
+
+  auth:
+    <<: *db-host
+    depends_on: !reset {}
+    environment:
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${DB_HOST:?set DB_HOST in .env}:${DB_PORT:-5432}/${DB_NAME:-postgres}?sslmode=${DB_SSLMODE:-disable}
+
+  rest:
+    <<: *db-host
+    depends_on: !reset {}
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-postgres}?sslmode=${DB_SSLMODE:-disable}
+      # A plain Postgres has no graphql_public schema.
+      PGRST_DB_SCHEMAS: public,storage
+
+  storage:
+    <<: *db-host
+    # Storage's own tables reference auth.uid(), which the sign-in service
+    # creates on first start — so start after it.
+    depends_on: !override
+      auth: { condition: service_healthy }
+      rest: { condition: service_started }
+    environment:
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-postgres}?sslmode=${DB_SSLMODE:-disable}
+
+  migrate:
+    <<: *db-host
+    depends_on: !override
+      auth: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    environment:
+      PGHOST: ${DB_HOST}
+      PGPORT: ${DB_PORT:-5432}
+      PGDATABASE: ${DB_NAME:-postgres}
+      PGUSER: nixflow_migrator
+      PGSSLMODE: ${DB_SSLMODE:-disable}
