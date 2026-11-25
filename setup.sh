@@ -65,6 +65,10 @@ RESEND_API_KEY=
 EMAIL_FROM=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
+
+# Daily update check: sends only a random install ID + version to
+# api.nixflow.cloud so the app can say "update available". false = off.
+UPDATE_CHECK=true
 EOF
 
 echo "Wrote .env (app: ${PUBLIC_URL}, admin portal: ${ADMIN_URL})."

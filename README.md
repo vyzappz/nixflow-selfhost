@@ -117,7 +117,14 @@ tables on start, as usual.
 
 ## Privacy
 
-A self-hosted server sends nothing to Nixflow: no usage tracking, no sign-up or
-support notifications. Outside connections happen only when you use them
-(AI providers, apps your workflows call). Even the fonts are served by your
-own server.
+Your users, workflows, runs and files never leave your server. What a
+self-hosted server sends to Nixflow — and how to stop it:
+
+| What | When | Contains | Turn off |
+|---|---|---|---|
+| **Update check** | once a day | a random install ID + your Nixflow version | `UPDATE_CHECK=false` in `.env` |
+| **Registration** | only if an admin clicks **Register** on the dashboard and ticks consent | your company name + the install ID (registration date is recorded) | just don't register (the card can be dismissed) |
+
+Nothing else: no usage tracking, no sign-up or support notifications. Other
+outside connections happen only when you use them (AI providers, apps your
+workflows call). Even the fonts are served by your own server.
