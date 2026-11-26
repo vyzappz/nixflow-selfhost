@@ -17,18 +17,27 @@ git clone https://github.com/vyzappz/nixflow-selfhost.git && cd nixflow-selfhost
 docker compose up -d       # downloads the images and starts Nixflow
 ```
 
-Open **http://localhost:8080** and sign up. The first account creates your
-workspace. The admin portal (team, roles, your AI key) is at
-**http://localhost:8081**.
+Then open Nixflow and sign up — the first account creates your workspace. The
+admin portal is where you manage your team, roles and AI key. **Which address
+to open depends on where you installed it:**
 
-On a server with a domain, pass your addresses to `setup.sh`:
+| Installed on | Run setup with | Open the app at | Admin portal |
+|---|---|---|---|
+| **Your own computer** | `./setup.sh` | http://localhost:8080 | http://localhost:8081 |
+| **A server, no domain** | `./setup.sh http://SERVER-IP:8080 http://SERVER-IP:8081` | http://SERVER-IP:8080 | http://SERVER-IP:8081 |
+| **A server with a domain** | `./setup.sh https://nixflow.example.com https://nixflow-admin.example.com` | your app domain | your admin domain |
 
-```sh
-./setup.sh https://nixflow.example.com https://nixflow-admin.example.com
-```
+Replace `SERVER-IP` with your server's public IP (e.g. `203.0.113.10`), and
+open ports 8080 and 8081 in its firewall. `localhost` only works on the machine
+Nixflow runs on — from another computer, use the server's IP or domain.
 
-and put a reverse proxy with HTTPS (Caddy, nginx, Traefik…) in front of ports
-8080 (app) and 8081 (admin portal).
+**With a domain**, put a reverse proxy with HTTPS (Caddy, nginx, Traefik…) in
+front of port 8080 (app) and 8081 (admin portal). Use this for anything beyond
+testing: without HTTPS, passwords travel unencrypted.
+
+**Already ran `./setup.sh` with the wrong address?** It won't overwrite your
+`.env` (it holds your secrets). Edit `PUBLIC_URL` and `ADMIN_URL` in `.env`
+instead, then run `docker compose up -d` (everyone signs in again).
 
 ## What runs
 
