@@ -30,9 +30,15 @@ own key, webhooks, schedules, the database and file manager — is in Community.
   internet? It registers locally and sends the name later.
 - **Upgrading never breaks a server.** Tracks that were already switched on
   before the limits existed keep running; only new ones count.
-- **Business license:** email support@nixflow.cloud. You get a key; an admin
-  pastes it in the admin portal → **License**. The key is checked on your
-  server itself, so it works offline.
+- **Business license or add-ons:** buy at
+  https://nixflow.cloud/self-hosted/pricing (or from the **Get Business**
+  button in your admin portal → License — then the key installs itself on your
+  server within a day). The key is also emailed; an admin can paste it in the
+  admin portal → **License**. Keys are checked on your server itself, so they
+  work offline. Add-ons (more users, more tracks and runs, enterprise apps,
+  environments, AI pack, insights, team, portal, priority support) can be bought
+  on their own.
+- **Renewal:** when a license ends, everything keeps working for 14 more days.
 
 Changing or bypassing the license check isn't allowed by Nixflow's license
 (Elastic License 2.0).
