@@ -51,16 +51,33 @@ instead, then run `docker compose up -d` (everyone signs in again).
 | `rest`    | Database API used by the app                              |
 | `storage` | Uploaded files (`storage-data` volume)                    |
 
-## Upgrade
+## Update
+
+When a new version is out, admins see a banner in Nixflow saying what's new.
+To update, run this in the Nixflow folder:
 
 ```sh
-git pull                 # latest install files
-docker compose pull      # latest images
-docker compose up -d
+./update.sh              # backs up, downloads the new version, restarts
 ```
 
-New database migrations apply automatically on start. To stay on a version
-until you choose to move, set `NIXFLOW_VERSION=1.0.0` (for example) in `.env`.
+It takes a backup first (`./backup.sh`), then updates and restarts. Database
+changes apply automatically on start. If anything goes wrong, restore the
+backup with `./restore.sh backups/<folder>`.
+
+**Automatic updates (optional):**
+
+```sh
+./update.sh --auto-on    # every night at 03:00: if there's a new version, back up and update
+./update.sh --auto-off   # turn it off again
+```
+
+The nightly check does nothing when you're already up to date. Its log is
+`backups/update.log`. To stay on a version until you choose to move, set
+`NIXFLOW_VERSION=1.0.0` (for example) in `.env` — updates then stop until
+you change it.
+
+Nixflow never updates your server by itself: updates happen only when you run
+`./update.sh` or turn on automatic updates.
 
 ## Back up and restore
 
