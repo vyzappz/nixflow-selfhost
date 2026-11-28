@@ -1,7 +1,41 @@
 # Nixflow — self-hosted
 
-Run Nixflow on your own server, free. Same app as Nixflow Cloud, without
-billing or plan limits: unlimited workflows, runs and users.
+Run Nixflow on your own server, free — including for your business. The free
+**Community** edition is the same app as Nixflow Cloud for a small team; a
+**Business** license lifts the limits and unlocks the rest (see
+[Community and Business](#community-and-business)).
+
+## Community and Business
+
+| | Community (free) | Business (license key) |
+|---|---|---|
+| Tracks switched on at once | 10 | Unlimited |
+| Runs per month | 5,000 | Unlimited |
+| Users | 5 | Unlimited |
+| Workspaces (companies) | 1 | Unlimited |
+| Run history | last 7 days | Unlimited |
+| Environments | Dev | Dev, Test, Prod + Deployments |
+| Roles | Admin, Editor | + Viewer, per-feature permissions |
+| Version history, Reports, Activity logs | — | ✓ |
+| Enterprise apps (SAP, NetSuite, Coupa, Workday, ServiceNow, Jira, Salesforce) | — | ✓ |
+| AI Consultant, Knowledge bases, custom Job History columns | — | ✓ |
+| External User Portal, no "Powered by Nixflow" | — | ✓ |
+| Support | Community forum | Email support |
+
+Everything else — every other app and step, AI Agent and Assistant with your
+own key, webhooks, schedules, the database and file manager — is in Community.
+
+- **Register once.** On first sign-in an admin registers the server with the
+  company name (only the name is sent, with the install ID and version). No
+  internet? It registers locally and sends the name later.
+- **Upgrading never breaks a server.** Tracks that were already switched on
+  before the limits existed keep running; only new ones count.
+- **Business license:** email support@nixflow.cloud. You get a key; an admin
+  pastes it in the admin portal → **License**. The key is checked on your
+  server itself, so it works offline.
+
+Changing or bypassing the license check isn't allowed by Nixflow's license
+(Elastic License 2.0).
 
 ## What you need
 
